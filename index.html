@@ -1,0 +1,379 @@
+import React, { useState } from 'react';
+import { Leaf, Plus, X } from 'lucide-react';
+
+const Event = ({ event, isSelected, onSelect, onEdit, onDelete }) => (
+  <div 
+    className={`p-3 rounded-lg ${isSelected ? 'bg-green-50' : 'bg-white'} 
+    border border-green-100 flex items-center gap-3 cursor-pointer`}
+    onClick={() => onSelect(event)}
+  >
+    <div
+      className="w-6 h-6 rounded-full"
+      style={{ backgroundColor: event.color }}
+    />
+    <input
+      value={event.name}
+      onChange={(e) => onEdit({ ...event, name: e.target.value })}
+      className="flex-1 bg-transparent outline-none"
+      onClick={(e) => e.stopPropagation()}
+    />
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onDelete(event.id);
+      }}
+      className="p-1 hover:bg-red-50 rounded-full"
+    >
+      <X className="w-4 h-4 text-red-500" />
+    </button>
+  </div>
+);
+
+export default function Calendar() {
+  const [view, setView] = useState('months');
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [selectedWeek, setSelectedWeek] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [selectedHours, setSelectedHours] = useState({});
+  const [activeEvent, setActiveEvent] = useState(null);
+  const [events, setEvents] = useState([
+    { id: 1, name: 'Work', color: '#2F855A' },
+    { id: 2, name: 'Exercise', color: '#9C4221' },
+    { id: 3, name: 'Study', color: '#744210' }
+  ]);
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  const getCirclePosition = (index, total) => {
+    const angle = (index * 360 / total - 90) * (Math.PI / 180);
+    return {
+      x: 150 + 90 * Math.cos(angle),
+      y: 150 + 90 * Math.sin(angle)
+    };
+  };
+
+  const getHourSlice = (hour) => {
+    const startAngle = hour * 15 - 90;
+    const endAngle = startAngle + 15;
+    const innerRadius = 50;
+    const outerRadius = 120;
+    
+    const startRad = (startAngle * Math.PI) / 180;
+    const endRad = (endAngle * Math.PI) / 180;
+    
+    const path = [
+      `M ${150 + innerRadius * Math.cos(startRad)} ${150 + innerRadius * Math.sin(startRad)}`,
+      `L ${150 + outerRadius * Math.cos(startRad)} ${150 + outerRadius * Math.sin(startRad)}`,
+      `A ${outerRadius} ${outerRadius} 0 0 1 ${150 + outerRadius * Math.cos(endRad)} ${150 + outerRadius * Math.sin(endRad)}`,
+      `L ${150 + innerRadius * Math.cos(endRad)} ${150 + innerRadius * Math.sin(endRad)}`,
+      `A ${innerRadius} ${innerRadius} 0 0 0 ${150 + innerRadius * Math.cos(startRad)} ${150 + innerRadius * Math.sin(startRad)}`,
+    ].join(' ');
+
+    return {
+      path,
+      labelX: 150 + 85 * Math.cos((startAngle + 7.5) * Math.PI / 180),
+      labelY: 150 + 85 * Math.sin((startAngle + 7.5) * Math.PI / 180)
+    };
+  };
+
+  const getMonthWeeks = (month) => {
+    const firstDay = new Date(2024, month, 1);
+    const lastDay = new Date(2024, month + 1, 0);
+    const firstDayOfWeek = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+    
+    const weeks = [];
+    let currentDay = 1;
+    
+    while (currentDay <= totalDays) {
+      const week = [];
+      for (let i = 0; i < 7; i++) {
+        if ((weeks.length === 0 && i < firstDayOfWeek) || currentDay > totalDays) {
+          week.push(null);
+        } else {
+          week.push(currentDay);
+          currentDay++;
+        }
+      }
+      weeks.push(week);
+    }
+    
+    return weeks;
+  };
+
+  const handleBack = () => {
+    if (view === 'hours') {
+      setView('days');
+    } else if (view === 'days') {
+      setView('weeks');
+    } else if (view === 'weeks') {
+      setView('months');
+      setSelectedMonth(null);
+    }
+  };
+
+  const handleHourClick = (hour) => {
+    if (!activeEvent) return;
+    
+    const newHours = { ...selectedHours };
+    if (newHours[hour]?.eventId === activeEvent.id) {
+      delete newHours[hour];
+    } else {
+      newHours[hour] = {
+        eventId: activeEvent.id,
+        color: activeEvent.color
+      };
+    }
+    setSelectedHours(newHours);
+  };
+
+  const addEvent = () => {
+    const natureColors = ['#2F855A', '#9C4221', '#744210', '#4A5568', '#975A16'];
+    const newEvent = {
+      id: events.length + 1,
+      name: `Event ${events.length + 1}`,
+      color: natureColors[Math.floor(Math.random() * natureColors.length)]
+    };
+    setEvents([...events, newEvent]);
+  };
+
+  const deleteEvent = (id) => {
+    setEvents(events.filter(e => e.id !== id));
+    if (activeEvent?.id === id) {
+      setActiveEvent(null);
+    }
+    const newHours = { ...selectedHours };
+    Object.keys(newHours).forEach(hour => {
+      if (newHours[hour].eventId === id) {
+        delete newHours[hour];
+      }
+    });
+    setSelectedHours(newHours);
+  };
+
+  return (
+    <div className="w-full max-w-3xl mx-auto p-6 bg-gradient-to-br from-green-50 to-stone-50 rounded-lg shadow-xl">
+      <div className="relative mb-6">
+        <div className="flex items-center justify-center gap-2">
+          <Leaf className="w-6 h-6 text-green-600" />
+          <h1 className="text-2xl font-serif text-green-800">
+            {view === 'months' && '2024'}
+            {view === 'weeks' && selectedMonth !== null && 
+              `${monthNames[selectedMonth]} 2024`}
+            {view === 'days' && selectedWeek !== null && 
+              `Week ${selectedWeek + 1}`}
+            {view === 'hours' && selectedDay !== null && 
+              `${dayNames[selectedDay]}`}
+          </h1>
+        </div>
+
+        {view !== 'months' && (
+          <button
+            onClick={handleBack}
+            className="absolute left-0 top-1/2 -translate-y-1/2 text-green-600 hover:text-green-800"
+          >
+            ← Back
+          </button>
+        )}
+      </div>
+
+      <div className="aspect-square mb-6">
+        <svg viewBox="0 0 300 300" className="w-full">
+          {/* Months View */}
+          {view === 'months' && monthNames.map((month, i) => {
+            const { x, y } = getCirclePosition(i, 12);
+            return (
+              <g
+                key={month}
+                onClick={() => {
+                  setSelectedMonth(i);
+                  setView('weeks');
+                }}
+                className="cursor-pointer"
+              >
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="28"
+                  className="fill-white stroke-green-200 hover:fill-green-50"
+                />
+                <text
+                  x={x}
+                  y={y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-sm fill-green-800"
+                >
+                  {month}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Weeks View */}
+          {view === 'weeks' && selectedMonth !== null && (() => {
+            const weeks = getMonthWeeks(selectedMonth);
+            return weeks.map((week, i) => {
+              const { x, y } = getCirclePosition(i, weeks.length);
+              const validDays = week.filter(d => d !== null);
+              return (
+                <g
+                  key={i}
+                  onClick={() => {
+                    setSelectedWeek(i);
+                    setView('days');
+                  }}
+                  className="cursor-pointer"
+                >
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r="28"
+                    className="fill-white stroke-green-200 hover:fill-green-50"
+                  />
+                  <text
+                    x={x}
+                    y={y - 10}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-sm fill-green-800"
+                  >
+                    Week {i + 1}
+                  </text>
+                  {validDays.length > 0 && (
+                    <text
+                      x={x}
+                      y={y + 10}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="text-xs fill-green-600"
+                    >
+                      {validDays[0]}-{validDays[validDays.length - 1]}
+                    </text>
+                  )}
+                </g>
+              );
+            });
+          })()}
+
+          {/* Days View */}
+          {view === 'days' && selectedMonth !== null && selectedWeek !== null && (() => {
+            const weeks = getMonthWeeks(selectedMonth);
+            const currentWeek = weeks[selectedWeek] || [];
+            
+            return dayNames.map((day, i) => {
+              const { x, y } = getCirclePosition(i, 7);
+              const date = currentWeek[i];
+              
+              return (
+                <g
+                  key={day}
+                  onClick={() => {
+                    if (date !== null) {
+                      setSelectedDay(i);
+                      setView('hours');
+                    }
+                  }}
+                  className={date !== null ? "cursor-pointer" : "opacity-50"}
+                >
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r="28"
+                    className="fill-white stroke-green-200 hover:fill-green-50"
+                  />
+                  <text
+                    x={x}
+                    y={y - 10}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-sm fill-green-800"
+                  >
+                    {day}
+                  </text>
+                  {date !== null && (
+                    <text
+                      x={x}
+                      y={y + 10}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="text-xs fill-green-600"
+                    >
+                      {date}
+                    </text>
+                  )}
+                </g>
+              );
+            });
+          })()}
+
+          {/* Hours View */}
+          {view === 'hours' && hours.map(hour => {
+            const { path, labelX, labelY } = getHourSlice(hour);
+            const hourData = selectedHours[hour];
+            return (
+              <g
+                key={hour}
+                onClick={() => handleHourClick(hour)}
+                className="cursor-pointer"
+              >
+                <path
+                  d={path}
+                  fill={hourData?.color || 'white'}
+                  className="stroke-green-100 hover:fill-green-50"
+                />
+                <text
+                  x={labelX}
+                  y={labelY}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-xs fill-green-800"
+                >
+                  {hour.toString().padStart(2, '0')}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {view === 'hours' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-serif text-green-800">Events</h2>
+            <button
+              onClick={addEvent}
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
+            >
+              <Plus className="w-4 h-4" />
+              Add Event
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {events.map(event => (
+              <Event
+                key={event.id}
+                event={event}
+                isSelected={activeEvent?.id === event.id}
+                onSelect={setActiveEvent}
+                onEdit={(updated) => {
+                  setEvents(events.map(e => 
+                    e.id === updated.id ? updated : e
+                  ));
+                  if (activeEvent?.id === updated.id) {
+                    setActiveEvent(updated);
+                  }
+                }}
+                onDelete={deleteEvent}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
